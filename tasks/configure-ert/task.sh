@@ -1,9 +1,12 @@
 #!/bin/bash
-set -eu
+
+set -euo pipefail
 
 export OPSMAN_DOMAIN_OR_IP_ADDRESS="opsman.$PCF_ERT_DOMAIN"
 
 source pcf-pipelines/functions/generate_cert.sh
+
+declare networking_poe_ssl_certs_json
 
 saml_domains=(
   "*.${SYSTEM_DOMAIN}"
@@ -15,20 +18,19 @@ saml_certificates=$(generate_cert "${saml_domains[*]}")
 saml_cert_pem=`echo $saml_certificates | jq --raw-output '.certificate'`
 saml_key_pem=`echo $saml_certificates | jq --raw-output '.key'`
 
-
-NETWORKING_POE_SSL_CERTS_JSON="$(ruby -r yaml -r json -e 'puts JSON.dump(YAML.load(ENV["NETWORKING_POE_SSL_CERTS"]))')"
-
 if [[ "${pcf_iaas}" == "aws" ]]; then
-  if [[ ${NETWORKING_POE_SSL_CERTS} == "" || ${NETWORKING_POE_SSL_CERTS} == "generate" || ${NETWORKING_POE_SSL_CERTS} == null ]]; then
+  if [[ ${POE_SSL_NAME1} == "" || ${POE_SSL_NAME1} == "null" ]]; then
     domains=(
-      "*.${SYSTEM_DOMAIN}"
-      "*.${APPS_DOMAIN}"
+        "*.${SYSTEM_DOMAIN}"
+        "*.${APPS_DOMAIN}"
+        "*.login.${SYSTEM_DOMAIN}"
+        "*.uaa.${SYSTEM_DOMAIN}"
     )
 
     certificate=$(generate_cert "${domains[*]}")
     pcf_ert_ssl_cert=`echo $certificate | jq '.certificate'`
     pcf_ert_ssl_key=`echo $certificate | jq '.key'`
-    NETWORKING_POE_SSL_CERTS_JSON="[
+    networking_poe_ssl_certs_json="[
       {
         \"name\": \"Certificate 1\",
         \"certificate\": {
@@ -37,6 +39,16 @@ if [[ "${pcf_iaas}" == "aws" ]]; then
         }
       }
     ]"
+  else
+    cert=${POE_SSL_CERT1//$'\n'/'\n'}
+    key=${POE_SSL_KEY1//$'\n'/'\n'}
+    networking_poe_ssl_certs_json="[{
+      \"name\": \"$POE_SSL_NAME1\",
+      \"certificate\": {
+        \"cert_pem\": \"$cert\",
+        \"private_key_pem\": \"$key\"
+      }
+    }]"
   fi
 
   cd terraform-state
@@ -57,7 +69,7 @@ elif [[ "${pcf_iaas}" == "gcp" ]]; then
     echo Failed to get SQL instance IP from Terraform state file
     exit 1
   fi
-  NETWORKING_POE_SSL_CERTS_JSON="[
+  networking_poe_ssl_certs_json="[
     {
       \"name\": \"Certificate 1\",
       \"certificate\": {
@@ -200,7 +212,7 @@ cf_properties=$(
     --arg mysql_backups_s3_secret_access_key "$MYSQL_BACKUPS_S3_SECRET_ACCESS_KEY" \
     --arg mysql_backups_s3_cron_schedule "$MYSQL_BACKUPS_S3_CRON_SCHEDULE" \
     --argjson credhub_encryption_keys "$CREDHUB_ENCRYPTION_KEYS_JSON" \
-    --argjson networking_poe_ssl_certs "$NETWORKING_POE_SSL_CERTS_JSON" \
+    --argjson networking_poe_ssl_certs "$networking_poe_ssl_certs_json" \
     --arg container_networking_nw_cidr "$CONTAINER_NETWORKING_NW_CIDR" \
     '
     {

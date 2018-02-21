@@ -1,12 +1,26 @@
 #!/bin/bash
 
-set -eu
+set -euo pipefail
 
 source pcf-pipelines/functions/generate_cert.sh
 
-NETWORKING_POE_SSL_CERTS_JSON="$(ruby -r yaml -r json -e 'puts JSON.dump(YAML.load(ENV["NETWORKING_POE_SSL_CERTS"]))')"
+declare networking_poe_ssl_certs_json
 
-if [[ ${NETWORKING_POE_SSL_CERTS} == "" || ${NETWORKING_POE_SSL_CERTS} == "generate" || ${NETWORKING_POE_SSL_CERTS} == null ]]; then
+function createNetworkingPoeSslCertsJson() {
+    name=$1
+    cert=${2//$'\n'/'\n'}
+    key=${3//$'\n'/'\n'}
+    networking_poe_ssl_certs_json="{
+      \"name\": \"$name\",
+      \"certificate\": {
+        \"cert_pem\": \"$cert\",
+        \"private_key_pem\": \"$key\"
+      }
+    }"
+    echo $networking_poe_ssl_certs_json
+}
+
+if [[ ${POE_SSL_NAME1} == "" || ${POE_SSL_NAME1} == "null" ]]; then
   domains=(
     "*.${SYSTEM_DOMAIN}"
     "*.${APPS_DOMAIN}"
@@ -17,7 +31,7 @@ if [[ ${NETWORKING_POE_SSL_CERTS} == "" || ${NETWORKING_POE_SSL_CERTS} == "gener
   certificate=$(generate_cert "${domains[*]}")
   pcf_ert_ssl_cert=`echo $certificate | jq '.certificate'`
   pcf_ert_ssl_key=`echo $certificate | jq '.key'`
-  NETWORKING_POE_SSL_CERTS_JSON="[
+  networking_poe_ssl_certs_json="[
     {
       \"name\": \"Certificate 1\",
       \"certificate\": {
@@ -26,8 +40,18 @@ if [[ ${NETWORKING_POE_SSL_CERTS} == "" || ${NETWORKING_POE_SSL_CERTS} == "gener
       }
     }
   ]"
+else
+    networking_poe_ssl_certs_json=$(createNetworkingPoeSslCertsJson "$POE_SSL_NAME1" "$POE_SSL_CERT1" "$POE_SSL_KEY1")
+    if [[ ! ${POE_SSL_NAME2} == "" && ! ${POE_SSL_NAME2} == "null" ]]; then
+        networking_poe_ssl_certs_json2=$(createNetworkingPoeSslCertsJson "$POE_SSL_NAME2" "$POE_SSL_CERT2" "$POE_SSL_KEY2")
+        networking_poe_ssl_certs_json="$networking_poe_ssl_certs_json,$networking_poe_ssl_certs_json2"
+    fi
+    if [[ ! ${POE_SSL_NAME3} == "" && ! ${POE_SSL_NAME3} == "null" ]]; then
+        networking_poe_ssl_certs_json3=$(createNetworkingPoeSslCertsJson "$POE_SSL_NAME3" "$POE_SSL_CERT3" "$POE_SSL_KEY3")
+        networking_poe_ssl_certs_json="$networking_poe_ssl_certs_json,$networking_poe_ssl_certs_json3"
+    fi
+    networking_poe_ssl_certs_json="[$networking_poe_ssl_certs_json]"
 fi
-
 
 if [[ -z "$SAML_SSL_CERT" ]]; then
   saml_cert_domains=(
@@ -112,7 +136,7 @@ cf_properties=$(
     --arg mysql_backups_scp_destination "$MYSQL_BACKUPS_SCP_DESTINATION" \
     --arg mysql_backups_scp_cron_schedule "$MYSQL_BACKUPS_SCP_CRON_SCHEDULE" \
     --argjson credhub_encryption_keys "$CREDHUB_ENCRYPTION_KEYS_JSON" \
-    --argjson networking_poe_ssl_certs "$NETWORKING_POE_SSL_CERTS_JSON" \
+    --argjson networking_poe_ssl_certs "$networking_poe_ssl_certs_json" \
     --arg container_networking_nw_cidr "$CONTAINER_NETWORKING_NW_CIDR" \
     '
     {
