@@ -2,56 +2,12 @@
 
 set -euo pipefail
 
+current_dir=$( dirname "${BASH_SOURCE[0]}" )
 source pcf-pipelines/functions/generate_cert.sh
+source "${current_dir}/create-network-poe-certs.sh"
 
-declare networking_poe_ssl_certs_json
 
-function createNetworkingPoeSslCertsJson() {
-    name=$1
-    cert=${2//$'\n'/'\n'}
-    key=${3//$'\n'/'\n'}
-    networking_poe_ssl_certs_json="{
-      \"name\": \"$name\",
-      \"certificate\": {
-        \"cert_pem\": \"$cert\",
-        \"private_key_pem\": \"$key\"
-      }
-    }"
-    echo $networking_poe_ssl_certs_json
-}
-
-if [[ ${POE_SSL_NAME1} == "" || ${POE_SSL_NAME1} == "null" ]]; then
-  domains=(
-    "*.${SYSTEM_DOMAIN}"
-    "*.${APPS_DOMAIN}"
-    "*.login.${SYSTEM_DOMAIN}"
-    "*.uaa.${SYSTEM_DOMAIN}"
-  )
-
-  certificate=$(generate_cert "${domains[*]}")
-  pcf_ert_ssl_cert=`echo $certificate | jq '.certificate'`
-  pcf_ert_ssl_key=`echo $certificate | jq '.key'`
-  networking_poe_ssl_certs_json="[
-    {
-      \"name\": \"Certificate 1\",
-      \"certificate\": {
-        \"cert_pem\": $pcf_ert_ssl_cert,
-        \"private_key_pem\": $pcf_ert_ssl_key
-      }
-    }
-  ]"
-else
-    networking_poe_ssl_certs_json=$(createNetworkingPoeSslCertsJson "$POE_SSL_NAME1" "$POE_SSL_CERT1" "$POE_SSL_KEY1")
-    if [[ ! ${POE_SSL_NAME2} == "" && ! ${POE_SSL_NAME2} == "null" ]]; then
-        networking_poe_ssl_certs_json2=$(createNetworkingPoeSslCertsJson "$POE_SSL_NAME2" "$POE_SSL_CERT2" "$POE_SSL_KEY2")
-        networking_poe_ssl_certs_json="$networking_poe_ssl_certs_json,$networking_poe_ssl_certs_json2"
-    fi
-    if [[ ! ${POE_SSL_NAME3} == "" && ! ${POE_SSL_NAME3} == "null" ]]; then
-        networking_poe_ssl_certs_json3=$(createNetworkingPoeSslCertsJson "$POE_SSL_NAME3" "$POE_SSL_CERT3" "$POE_SSL_KEY3")
-        networking_poe_ssl_certs_json="$networking_poe_ssl_certs_json,$networking_poe_ssl_certs_json3"
-    fi
-    networking_poe_ssl_certs_json="[$networking_poe_ssl_certs_json]"
-fi
+networking_poe_ssl_certs_json=$(createNetworkingPoeCerts)
 
 if [[ -z "$SAML_SSL_CERT" ]]; then
   saml_cert_domains=(
