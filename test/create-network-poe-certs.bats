@@ -14,12 +14,9 @@ setup() {
 }
 
 @test "should return one cert if only one is provided" {
-    result=$(createNetworkingPoeCerts "example.com" "example.com" "cert name" "cert" "key")
-    echo "result is $result"
-    expected_result="[{ \"name\": \"cert name\", \"certificate\": { \"cert_pem\": \"cert\", \"private_key_pem\": \"key\" } }]"
-    if [[ "$result" != "$expected_result" ]]; then
-        fail "Expected Cert $expected_result did match the actual result $result"
-    fi
+    expected_result="[{ \"name\": \"some-cert-name\", \"certificate\": { \"cert_pem\": \"some-cert\", \"private_key_pem\": \"some-key\" } }]"
+    run createNetworkingPoeCerts "example.com" "example.com" "some-cert-name" "some-cert" "some-key"
+    assert_output "${expected_result}"
 }
 
 
