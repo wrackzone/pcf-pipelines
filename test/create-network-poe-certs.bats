@@ -4,13 +4,24 @@ load 'libs/bats-support/load'
 load 'libs/bats-assert/load'
 load 'helpers/mocks/stub'
 
+generate_cert() {
+    echo "{\"certificate\": \"-----BEGIN CERTIFICATE-----\nMIIDTzCCAjegAw...\n-----END CERTIFICATE-----\n\", \"key\": \"-----BEGIN RSA PRIVATE KEY-----\nqD0IQKNpyp0m6w==...\n-----END RSA PRIVATE KEY-----\n\"}"
+}
+
 setup() {
   source "$BATS_TEST_DIRNAME/../tasks/config-ert/create-network-poe-certs.sh"
 }
 
 @test "should generate a cert if name not provided" {
     run createNetworkingPoeCerts "example.com" "example.com"
-    assert_success
+    expected_result="[ { \"name\": \"Certificate 1\", \"certificate\": { \"cert_pem\": \"-----BEGIN CERTIFICATE-----\nMIIDTzCCAjegAw...\n-----END CERTIFICATE-----\n\", \"private_key_pem\": \"-----BEGIN RSA PRIVATE KEY-----\nqD0IQKNpyp0m6w==...\n-----END RSA PRIVATE KEY-----\n\" } } ]"
+    assert_equal "${output}" "${expected_result}"
+}
+
+@test "should generate a cert if name is 'null'" {
+    run createNetworkingPoeCerts "example.com" "example.com" "null"
+    expected_result="[ { \"name\": \"Certificate 1\", \"certificate\": { \"cert_pem\": \"-----BEGIN CERTIFICATE-----\nMIIDTzCCAjegAw...\n-----END CERTIFICATE-----\n\", \"private_key_pem\": \"-----BEGIN RSA PRIVATE KEY-----\nqD0IQKNpyp0m6w==...\n-----END RSA PRIVATE KEY-----\n\" } } ]"
+    assert_equal "${output}" "${expected_result}"
 }
 
 @test "should return one cert if only one is provided" {

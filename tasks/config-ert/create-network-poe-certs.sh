@@ -16,12 +16,7 @@ function createNetworkingPoeCert() {
     echo $networking_poe_ssl_certs_json
 }
 
-function generate_cert() {
-    echo ""
-}
-
 function createNetworkingPoeCerts() {
-
     local sys_domain="${1:-$SYSTEM_DOMAIN}"
     local apps_domain="${2:-$APPS_DOMAIN}"
 
@@ -37,8 +32,6 @@ function createNetworkingPoeCerts() {
     local ssl_cert3="${10:-$POE_SSL_CERT3}"
     local ssl_key3="${11:-$POE_SSL_KEY3}"
 
-#    echo "Vars: $*"
-
     if [[ "${cert_name}" == "" || "${cert_name}" == "null" ]]; then
       domains=(
         "*.${sys_domain}"
@@ -46,8 +39,6 @@ function createNetworkingPoeCerts() {
         "*.login.${sys_domain}"
         "*.uaa.${sys_domain}"
       )
-
-#      echo "Domains ${domains[*]}"
 
       cert_pair=$(generate_cert "${domains[*]}")
       ssl_cert=`echo $cert_pair | jq '.certificate'`
